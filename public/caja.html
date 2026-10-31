@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Caja · SIGR</title>
+  <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+  <main>
+    <h1>Caja y reportes</h1>
+
+    <section class="tarjeta">
+      <form id="form-fecha">
+        <label>Fecha <input name="fecha" type="date" id="fecha" required></label>
+        <button class="secundario">Ver reporte</button>
+        <button type="button" id="cerrar">Cerrar caja</button>
+      </form>
+      <p class="mensaje" id="msg"></p>
+    </section>
+
+    <section class="rejilla">
+      <div class="tarjeta"><div class="suave">Ventas del día</div><div class="cifra" id="ventas">–</div></div>
+      <div class="tarjeta"><div class="suave">Pedidos pagados</div><div class="cifra" id="pagados">–</div></div>
+      <div class="tarjeta"><div class="suave">Ticket promedio</div><div class="cifra" id="ticket">–</div></div>
+      <div class="tarjeta"><div class="suave">Pendientes / cancelados</div><div class="cifra" id="otros">–</div></div>
+    </section>
+
+    <section class="tarjeta">
+      <h2>Platos más vendidos</h2>
+      <table>
+        <thead><tr><th>Plato</th><th>Unidades</th><th>Total</th></tr></thead>
+        <tbody id="top"></tbody>
+      </table>
+      <p class="suave" id="estado-cierre"></p>
+    </section>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script>
+    exigirSesion();
+    const msg = document.getElementById('msg');
+    const fecha = document.getElementById('fecha');
+
+    async function cargar() {
+      try {
+        const r = await api('GET', `/caja/reporte?fecha=${fecha.value}`);
+        document.getElementById('ventas').textContent = pesos(r.total_ventas);
+        document.getElementById('pagados').textContent = r.pedidos_pagados;
+        document.getElementById('ticket').textContent = pesos(r.ticket_promedio);
+        document.getElementById('otros').textContent = `${r.pedidos_pendientes} / ${r.pedidos_cancelados}`;
+        document.getElementById('top').innerHTML = r.platos_mas_vendidos
+          .map((p) => `<tr><td>${p.nombre}</td><td>${p.unidades}</td><td>${pesos(p.total)}</td></tr>`).join('');
+        document.getElementById('estado-cierre').textContent = r.cierre
+          ? `Caja cerrada el ${r.cierre.cerrado_en}` : 'Caja abierta';
+        mostrarMensaje(msg, '');
+      } catch (err) {
+        mostrarMensaje(msg, err.message, 'error');
+      }
+    }
+
+    document.getElementById('form-fecha').addEventListener('submit', (e) => { e.preventDefault(); cargar(); });
+    document.getElementById('cerrar').addEventListener('click', async () => {
+      try {
+        await api('POST', '/caja/cierre', { fecha: fecha.value });
+        await cargar();
+        mostrarMensaje(msg, 'Caja cerrada correctamente');
+      } catch (err) {
+        mostrarMensaje(msg, err.message, 'error');
+      }
+    });
+
+    (async () => {
+      await montarEncabezado();
+      fecha.value = new Date().toLocaleDateString('en-CA');
+      cargar();
+    })();
+  </script>
+</body>
+</html>
