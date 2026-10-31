@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Menú · SIGR</title>
+  <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+  <main>
+    <h1>Menú digital</h1>
+
+    <section class="tarjeta" id="admin" hidden>
+      <h2>Nuevo plato</h2>
+      <form id="form-plato">
+        <label>Nombre <input name="nombre" required></label>
+        <label>Precio <input name="precio" type="number" min="1" required></label>
+        <label>Categoría <select name="categoria_id" id="categorias"></select></label>
+        <button>Agregar</button>
+      </form>
+      <p class="mensaje" id="msg"></p>
+    </section>
+
+    <section class="tarjeta">
+      <table>
+        <thead><tr><th>Plato</th><th>Categoría</th><th>Precio</th><th>Disponible</th><th></th></tr></thead>
+        <tbody id="platos"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script>
+    const usuario = exigirSesion();
+    const esAdmin = usuario?.rol === 'admin';
+
+    async function cargar() {
+      const platos = await api('GET', '/menu/platos');
+      document.getElementById('platos').innerHTML = platos.map((p) => `
+        <tr>
+          <td>${p.nombre}</td><td>${p.categoria}</td><td>${pesos(p.precio)}</td>
+          <td>${p.disponible ? 'Sí' : 'No'}</td>
+          <td>${esAdmin ? `<button class="secundario" data-id="${p.id}" data-disp="${p.disponible}">${p.disponible ? 'Agotar' : 'Activar'}</button>` : ''}</td>
+        </tr>`).join('');
+    }
+
+    document.getElementById('platos').addEventListener('click', async (e) => {
+      const { id, disp } = e.target.dataset;
+      if (!id) return;
+      await api('PUT', `/menu/platos/${id}`, { disponible: disp !== 'true' });
+      cargar();
+    });
+
+    document.getElementById('form-plato').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const datos = Object.fromEntries(new FormData(e.target));
+      try {
+        await api('POST', '/menu/platos', { ...datos, precio: Number(datos.precio), categoria_id: Number(datos.categoria_id) });
+        e.target.reset();
+        mostrarMensaje(document.getElementById('msg'), 'Plato agregado');
+        cargar();
+      } catch (err) {
+        mostrarMensaje(document.getElementById('msg'), err.message, 'error');
+      }
+    });
+
+    (async () => {
+      await montarEncabezado();
+      if (esAdmin) {
+        document.getElementById('admin').hidden = false;
+        const categorias = await api('GET', '/menu/categorias');
+        document.getElementById('categorias').innerHTML = categorias.map((c) => `<option value="${c.id}">${c.nombre}</option>`).join('');
+      }
+      cargar();
+    })();
+  </script>
+</body>
+</html>
