@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pedidos · SIGR</title>
+  <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+  <main>
+    <h1>Pedidos</h1>
+
+    <section class="tarjeta">
+      <h2>Nuevo pedido</h2>
+      <form id="form-pedido">
+        <label>Mesa <input name="mesa" type="number" min="1" required></label>
+        <label>Plato <select name="plato_id" id="platos"></select></label>
+        <label>Cantidad <input name="cantidad" type="number" min="1" value="1" required></label>
+        <button>Registrar</button>
+      </form>
+      <p class="mensaje" id="msg"></p>
+    </section>
+
+    <section class="tarjeta">
+      <h2>Seguimiento <span class="suave" id="en-vivo"></span></h2>
+      <table>
+        <thead><tr><th>#</th><th>Mesa</th><th>Detalle</th><th>Total</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="pedidos"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script>
+    const usuario = exigirSesion();
+    const esPersonal = ['mesero', 'admin'].includes(usuario?.rol);
+    const SIGUIENTE = { recibido: 'en_preparacion', en_preparacion: 'listo', listo: 'entregado', entregado: 'pagado' };
+
+    async function cargar() {
+      const pedidos = await api('GET', '/pedidos');
+      document.getElementById('pedidos').innerHTML = pedidos.map((p) => `
+        <tr>
+          <td>${p.id}</td><td>${p.mesa}</td>
+          <td>${p.items.map((i) => `${i.cantidad} × ${i.nombre}`).join('<br>')}</td>
+          <td>${pesos(p.total)}</td>
+          <td><span class="estado ${p.estado}">${textoEstado(p.estado)}</span></td>
+          <td>${esPersonal && SIGUIENTE[p.estado]
+            ? `<button class="secundario" data-id="${p.id}" data-estado="${SIGUIENTE[p.estado]}">→ ${textoEstado(SIGUIENTE[p.estado])}</button>` : ''}</td>
+        </tr>`).join('');
+    }
+
+    document.getElementById('pedidos').addEventListener('click', async (e) => {
+      const { id, estado } = e.target.dataset;
+      if (id) await api('PATCH', `/pedidos/${id}/estado`, { estado });
+      if (!esPersonal) cargar();
+    });
+
+    document.getElementById('form-pedido').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const d = Object.fromEntries(new FormData(e.target));
+      try {
+        await api('POST', '/pedidos', { mesa: Number(d.mesa), items: [{ plato_id: Number(d.plato_id), cantidad: Number(d.cantidad) }] });
+        mostrarMensaje(document.getElementById('msg'), 'Pedido registrado');
+        if (!esPersonal) cargar();
+      } catch (err) {
+        mostrarMensaje(document.getElementById('msg'), err.message, 'error');
+      }
+    });
+
+    (async () => {
+      await montarEncabezado();
+      const platos = await api('GET', '/menu/platos?disponibles=1');
+      document.getElementById('platos').innerHTML = platos.map((p) => `<option value="${p.id}">${p.nombre} (${pesos(p.precio)})</option>`).join('');
+      await cargar();
+      if (esPersonal) {
+        const fuente = new EventSource(`/api/pedidos/en-vivo?token=${sesion.token}`);
+        fuente.onopen = () => { document.getElementById('en-vivo').textContent = '● en vivo'; };
+        fuente.onmessage = cargar;
+      }
+    })();
+  </script>
+</body>
+</html>
