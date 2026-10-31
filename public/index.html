@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SIGR</title>
+  <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+  <main>
+    <section id="ingreso" class="tarjeta" hidden>
+      <h1>Sistema Integral de Gestión de Restaurante</h1>
+      <form id="form-login">
+        <label>Usuario <input name="usuario" required autocomplete="username"></label>
+        <label>Clave <input name="clave" type="password" required autocomplete="current-password"></label>
+        <button>Ingresar</button>
+      </form>
+      <p class="mensaje" id="msg"></p>
+      <p class="suave">Usuarios de prueba: admin / admin123 · mesero / mesero123 · cliente / cliente123</p>
+    </section>
+
+    <section id="inicio" hidden>
+      <h1 id="saludo"></h1>
+      <div class="rejilla" id="modulos"></div>
+    </section>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script>
+    (async () => {
+      await montarEncabezado();
+      if (!sesion.token) {
+        document.getElementById('ingreso').hidden = false;
+        document.getElementById('form-login').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          try {
+            sesion.guardar(await api('POST', '/auth/login', Object.fromEntries(new FormData(e.target))));
+            location.reload();
+          } catch (err) {
+            mostrarMensaje(document.getElementById('msg'), err.message, 'error');
+          }
+        });
+        return;
+      }
+      document.getElementById('inicio').hidden = false;
+      document.getElementById('saludo').textContent = `Hola, ${sesion.usuario.nombre}`;
+      const modulos = (await api('GET', '/modulos')).filter((m) => m.pagina);
+      document.getElementById('modulos').innerHTML = modulos
+        .map((m) => `<a class="tarjeta" style="text-decoration:none;color:inherit" href="/${m.pagina}"><h2>${m.titulo}</h2></a>`)
+        .join('');
+    })();
+  </script>
+</body>
+</html>

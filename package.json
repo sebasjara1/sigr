@@ -1,0 +1,17 @@
+{
+  "name": "sigr",
+  "version": "1.0.0",
+  "description": "Sistema Integral de Gestión de Restaurante",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node --no-warnings=ExperimentalWarning src/server.js",
+    "test": "node --no-warnings=ExperimentalWarning --test --test-reporter=spec"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
