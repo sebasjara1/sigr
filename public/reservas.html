@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reservas · SIGR</title>
+  <link rel="stylesheet" href="/css/estilos.css">
+</head>
+<body>
+  <main>
+    <h1>Reservas</h1>
+
+    <section class="tarjeta">
+      <h2>Nueva reserva</h2>
+      <form id="form-reserva">
+        <label>Nombre <input name="nombre_cliente" required></label>
+        <label>Teléfono <input name="telefono" required></label>
+        <label>Personas <input name="personas" type="number" min="1" value="2" required></label>
+        <label>Fecha <input name="fecha" type="date" required></label>
+        <label>Hora <input name="hora" type="time" min="11:00" max="22:00" step="1800" value="19:00" required></label>
+        <button>Reservar</button>
+      </form>
+      <p class="mensaje" id="msg"></p>
+    </section>
+
+    <section class="tarjeta">
+      <table>
+        <thead><tr><th>Fecha</th><th>Hora</th><th>Cliente</th><th>Personas</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="reservas"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script>
+    exigirSesion();
+
+    async function cargar() {
+      const reservas = await api('GET', '/reservas');
+      document.getElementById('reservas').innerHTML = reservas.map((r) => `
+        <tr>
+          <td>${r.fecha}</td><td>${r.hora}</td><td>${r.nombre_cliente} · ${r.telefono}</td><td>${r.personas}</td>
+          <td><span class="estado ${r.estado}">${r.estado}</span></td>
+          <td>${r.estado === 'confirmada' ? `<button class="secundario" data-id="${r.id}">Cancelar</button>` : ''}</td>
+        </tr>`).join('');
+    }
+
+    document.getElementById('reservas').addEventListener('click', async (e) => {
+      if (!e.target.dataset.id) return;
+      await api('PATCH', `/reservas/${e.target.dataset.id}/cancelar`);
+      cargar();
+    });
+
+    document.getElementById('form-reserva').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const d = Object.fromEntries(new FormData(e.target));
+      try {
+        await api('POST', '/reservas', { ...d, personas: Number(d.personas) });
+        mostrarMensaje(document.getElementById('msg'), 'Reserva confirmada');
+        cargar();
+      } catch (err) {
+        mostrarMensaje(document.getElementById('msg'), err.message, 'error');
+      }
+    });
+
+    (async () => {
+      await montarEncabezado();
+      cargar();
+    })();
+  </script>
+</body>
+</html>
